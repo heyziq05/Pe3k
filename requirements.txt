@@ -1,0 +1,13 @@
+# Pe3k runtime dependencies
+Flask>=3.0,<4
+APScheduler>=3.10,<4
+ping3>=4.0,<6
+psutil>=5.9
+python-dotenv>=1.0
+waitress>=3.0          # production WSGI server (works on Windows)
+
+# Optional: ARP discovery engine (needs admin rights; Npcap on Windows)
+scapy>=2.5
+
+# Development / tests
+pytest>=8.0
