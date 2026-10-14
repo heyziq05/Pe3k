@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data/
+logs/
+.pytest_cache/
+
+# local databases 
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+
+# editor / OS clutter
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
