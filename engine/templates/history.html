@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Device History{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Device history</h1>
+    <p>Status, latency, uptime and outages recorded by the ping monitor.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-glass" id="exportUptime" href="{{ url_for('exports.uptime_csv') }}"><i class="bi bi-filetype-csv" aria-hidden="true"></i>Uptime summary CSV</a>
+    {% if device_id %}<a class="btn btn-accent" id="exportHistory" href="{{ url_for('exports.device_history_csv', device_id=device_id) }}"><i class="bi bi-download" aria-hidden="true"></i>Export CSV</a>{% endif %}
+  </div>
+</div>
+
+{% if not devices %}
+<div class="glass-card flat">
+  <div class="empty"><i class="bi bi-clock-history"></i><h3>No devices to show</h3><p>Add a trusted device and Pe3k will start recording its history.</p>
+    <a class="btn btn-accent btn-sm" href="{{ url_for('pages.devices') }}#add"><i class="bi bi-plus-lg"></i>Add device</a></div>
+</div>
+{% else %}
+<div class="glass-card flat mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-12 col-md-6 col-lg-5">
+      <label class="form-label" for="deviceSelect">Device</label>
+      <select class="form-select" id="deviceSelect">
+        {% for d in devices %}<option value="{{ d.id }}" {% if d.id == device_id %}selected{% endif %}>{{ d.name }} — {{ d.ip_address }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-6 col-lg-7 d-flex justify-content-md-end">
+      <div class="btn-group-glass" role="group" aria-label="Time window" id="windowSel">
+        <button class="btn" type="button" data-w="1h">1h</button>
+        <button class="btn active" type="button" data-w="24h" aria-pressed="true">24h</button>
+        <button class="btn" type="button" data-w="7d">7 days</button>
+        <button class="btn" type="button" data-w="30d">30 days</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3" id="historyRoot" data-device="{{ device_id }}">
+  <div class="col-6 col-xl-3"><div class="glass-card kpi">
+    <span class="kpi-label">Current status</span>
+    <span class="kpi-value" id="hStatus"><span class="skeleton" style="width:6ch;height:1.6rem"></span></span>
+    <span class="kpi-foot" id="hSeen">—</span>
+  </div></div>
+  <div class="col-6 col-xl-3"><div class="glass-card kpi">
+    <span class="kpi-label">Uptime <span class="chip" id="hWindowChip">24h</span></span>
+    <span class="kpi-value tabular" id="hUptime">—</span>
+    <div class="uptime-bar" id="hUptimeBar" aria-hidden="true"><span style="width:0"></span></div>
+    <span class="kpi-foot tabular" id="hUptimeOther">—</span>
+  </div></div>
+  <div class="col-6 col-xl-3"><div class="glass-card kpi">
+    <span class="kpi-label">Checks</span>
+    <span class="kpi-value tabular" id="hChecks">—</span>
+    <span class="kpi-foot tabular" id="hChecksSplit">—</span>
+  </div></div>
+  <div class="col-6 col-xl-3"><div class="glass-card kpi">
+    <span class="kpi-label">Latency (avg)</span>
+    <span class="kpi-value tabular" id="hLatency">—</span>
+    <span class="kpi-foot tabular" id="hLatencyRange">—</span>
+  </div></div>
+
+  <div class="col-12 col-xl-8"><div class="glass-card">
+    <div class="card-title-row"><h2 class="card-title"><i class="bi bi-graph-up" aria-hidden="true"></i>Latency</h2>
+      <span class="card-sub">Average per interval · gaps mean no reply</span></div>
+    <div class="chart-box"><canvas id="latChart" role="img" aria-label="Latency chart"></canvas><div class="chart-empty">No successful checks in this window.</div></div>
+  </div></div>
+  <div class="col-12 col-xl-4"><div class="glass-card">
+    <div class="card-title-row"><h2 class="card-title"><i class="bi bi-bar-chart" aria-hidden="true"></i>Availability</h2>
+      <span class="card-sub">% of checks answered</span></div>
+    <div class="chart-box"><canvas id="availChart" role="img" aria-label="Availability chart"></canvas><div class="chart-empty">No checks in this window.</div></div>
+  </div></div>
+
+  <div class="col-12 col-xl-5"><div class="glass-card flat">
+    <div class="card-title-row"><h2 class="card-title"><i class="bi bi-lightning" aria-hidden="true"></i>Outages</h2><span class="card-sub" id="outageCount"></span></div>
+    <div class="table-wrap"><table class="table table-glass">
+      <thead><tr><th>Started</th><th>Ended</th><th class="text-end">Duration</th></tr></thead>
+      <tbody id="outageRows"></tbody></table></div>
+  </div></div>
+  <div class="col-12 col-xl-7"><div class="glass-card">
+    <div class="card-title-row"><h2 class="card-title"><i class="bi bi-list-check" aria-hidden="true"></i>Recent checks</h2>
+      <div class="d-flex gap-2 align-items-center"><span class="card-sub" id="pageInfo"></span>
+        <button class="btn btn-glass btn-sm" id="prevPage" aria-label="Newer checks"><i class="bi bi-chevron-left"></i></button>
+        <button class="btn btn-glass btn-sm" id="nextPage" aria-label="Older checks"><i class="bi bi-chevron-right"></i></button></div></div>
+    <div class="table-wrap"><table class="table table-glass">
+      <thead><tr><th>Time</th><th>Result</th><th class="text-end">Latency</th><th class="hide-xs">Status after</th><th class="hide-xs">Attempts</th></tr></thead>
+      <tbody id="checkRows"></tbody></table></div>
+  </div></div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if devices %}<script src="{{ url_for('static', filename='js/history.js') }}?v={{ app_version }}"></script>{% endif %}{% endblock %}

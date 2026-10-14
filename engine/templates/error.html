@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-8 col-lg-6">
+    <div class="glass-card flat text-center py-5">
+      <div class="display-5 fw-bold mb-2">{{ code }}</div>
+      <p class="text-2 mb-4">{{ message }}</p>
+      <a class="btn btn-accent" href="{{ url_for('pages.dashboard') }}"><i class="bi bi-house" aria-hidden="true"></i>Back to dashboard</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

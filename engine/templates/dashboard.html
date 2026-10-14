@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Network overview</h1>
+    <p>Live status of your trusted devices, discovery scans and this computer's bandwidth.</p>
+  </div>
+  <div class="page-actions">
+    <span class="text-muted small" id="lastUpdated" aria-live="polite"></span>
+    <button class="btn btn-glass" id="pingNow" type="button"><i class="bi bi-broadcast" aria-hidden="true"></i>Ping all now</button>
+    <a class="btn btn-accent" href="{{ url_for('pages.devices') }}#add"><i class="bi bi-plus-lg" aria-hidden="true"></i>Add device</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-6 col-xl-3">
+    <div class="glass-card kpi">
+      <span class="kpi-icon accent"><i class="bi bi-hdd-network" aria-hidden="true"></i></span>
+      <span class="kpi-label">Devices</span>
+      <span class="kpi-value tabular" id="kTotal"><span class="skeleton" style="width:3ch;height:1.6rem"></span></span>
+      <span class="kpi-foot"><span id="kTrusted">—</span></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="glass-card kpi">
+      <span class="kpi-icon ok"><i class="bi bi-check-circle" aria-hidden="true"></i></span>
+      <span class="kpi-label">Online</span>
+      <span class="kpi-value tabular" id="kOnline"><span class="skeleton" style="width:3ch;height:1.6rem"></span></span>
+      <span class="kpi-foot"><span id="kUnstable">—</span></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="glass-card kpi">
+      <span class="kpi-icon bad"><i class="bi bi-x-circle" aria-hidden="true"></i></span>
+      <span class="kpi-label">Offline</span>
+      <span class="kpi-value tabular" id="kOffline"><span class="skeleton" style="width:3ch;height:1.6rem"></span></span>
+      <span class="kpi-foot"><span id="kPending">—</span></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <a class="glass-card kpi d-flex text-reset text-decoration-none" href="{{ url_for('pages.alerts') }}">
+      <span class="kpi-icon warn"><i class="bi bi-shield-exclamation" aria-hidden="true"></i></span>
+      <span class="kpi-label">Unknown devices</span>
+      <span class="kpi-value tabular" id="kUnknown"><span class="skeleton" style="width:3ch;height:1.6rem"></span></span>
+      <span class="kpi-foot"><span id="kAlerts">—</span></span>
+    </a>
+  </div>
+
+  <!-- scanner + bandwidth -->
+  <div class="col-12 col-lg-4">
+    <div class="glass-card">
+      <div class="card-title-row">
+        <h2 class="card-title"><i class="bi bi-radar" aria-hidden="true"></i>Discovery scanner</h2>
+        <span id="scanState"></span>
+      </div>
+      <div id="scanBody"><span class="skeleton mb-2"></span><span class="skeleton mb-2" style="width:70%"></span><span class="skeleton" style="width:50%"></span></div>
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-glass btn-sm" id="scanNow" type="button"><i class="bi bi-search" aria-hidden="true"></i>Scan now</button>
+        <a class="btn btn-glass btn-sm" href="{{ url_for('pages.settings') }}"><i class="bi bi-sliders" aria-hidden="true"></i>Configure</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-8">
+    <div class="glass-card">
+      <div class="card-title-row">
+        <div>
+          <h2 class="card-title"><i class="bi bi-speedometer2" aria-hidden="true"></i>Bandwidth <span class="chip" id="bwIface">this computer</span></h2>
+          <p class="card-sub mt-1">Host traffic only — measures this computer, not every device on the network.</p>
+        </div>
+        <a class="btn btn-glass btn-sm" href="{{ url_for('pages.bandwidth') }}">Details</a>
+      </div>
+      <div class="row g-3 align-items-stretch">
+        <div class="col-12 col-md-4 d-flex flex-row flex-md-column gap-3">
+          <div class="kpi flex-fill">
+            <span class="kpi-label"><i class="bi bi-arrow-down-circle-fill" style="color:var(--series-1)" aria-hidden="true"></i>Download</span>
+            <span class="kpi-value tabular"><span id="bwDown">—</span><span class="unit">Mbps</span></span>
+            <span class="kpi-foot">Today <strong class="tabular" id="bwDownToday">—</strong></span>
+          </div>
+          <div class="kpi flex-fill">
+            <span class="kpi-label"><i class="bi bi-arrow-up-circle-fill" style="color:var(--series-2)" aria-hidden="true"></i>Upload</span>
+            <span class="kpi-value tabular"><span id="bwUp">—</span><span class="unit">Mbps</span></span>
+            <span class="kpi-foot">Today <strong class="tabular" id="bwUpToday">—</strong></span>
+          </div>
+          <span class="small bad-text" id="bwError"></span>
+        </div>
+        <div class="col-12 col-md-8">
+          <div class="chart-box" style="height:210px"><canvas id="bwChart" aria-label="Live bandwidth chart" role="img"></canvas>
+            <div class="chart-empty">Collecting samples…</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- device table + side column -->
+  <div class="col-12 col-xl-8">
+    <div class="glass-card">
+      <div class="card-title-row">
+        <h2 class="card-title"><i class="bi bi-activity" aria-hidden="true"></i>Device status</h2>
+        <a class="btn btn-glass btn-sm" href="{{ url_for('pages.devices') }}">Manage devices</a>
+      </div>
+      <div class="table-wrap">
+        <table class="table table-glass table-hover">
+          <thead><tr><th>Device</th><th>Status</th><th class="text-end">Latency</th><th class="hide-xs">Last seen</th><th class="hide-xs">Type</th></tr></thead>
+          <tbody id="deviceRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4 d-flex flex-column gap-3">
+    <div class="glass-card flat">
+      <div class="card-title-row">
+        <h2 class="card-title"><i class="bi bi-bell" aria-hidden="true"></i>Recent alerts</h2>
+        <a class="btn btn-glass btn-sm" href="{{ url_for('pages.alerts') }}">View all</a>
+      </div>
+      <div id="alertList"><span class="skeleton mb-3"></span><span class="skeleton mb-3"></span><span class="skeleton"></span></div>
+    </div>
+    <div class="glass-card flat flex-fill fill-chart">
+      <div class="card-title-row">
+        <div>
+          <h2 class="card-title"><i class="bi bi-graph-up" aria-hidden="true"></i>Latency</h2>
+          <div class="legend mt-1"><span><i style="background:var(--series-1)"></i>Average</span><span><i style="background:var(--series-2)"></i>Slowest device</span></div>
+        </div>
+        <div class="btn-group-glass" role="group" aria-label="Latency window" id="latWindow">
+          <button class="btn" type="button" data-w="1h">1h</button><button class="btn active" type="button" data-w="6h" aria-pressed="true">6h</button><button class="btn" type="button" data-w="24h">24h</button>
+        </div>
+      </div>
+      <div class="chart-box"><canvas id="latencyChart" aria-label="Latency over time chart" role="img"></canvas>
+        <div class="chart-empty">No latency data yet — checks run every ping interval.</div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/dashboard.js') }}?v={{ app_version }}"></script>{% endblock %}

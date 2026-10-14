@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <p>Discovery engine, authorized scan range, monitoring thresholds and dependency health.</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-glass" type="button" id="refreshHealth"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Re-check dependencies</button>
+  </div>
+</div>
+
+<div class="notice warn mb-3" role="note">
+  <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
+  <div><strong>Only scan networks you own or are authorized to monitor.</strong> Scanning other people's networks may be illegal and
+    against your provider's terms. Pe3k scans only the authorized subnet below, never falls back to a different engine,
+    and blocks scanning until you confirm authorization.</div>
+</div>
+
+<form id="settingsForm" novalidate>
+  <div class="notice bad d-none mb-3" data-form-error role="alert"></div>
+  <div class="row g-3">
+    <!-- Settings mode -->
+    <div class="col-12"><div class="glass-card flat">
+      <div class="card-title-row">
+        <div><h2 class="card-title"><i class="bi bi-toggles" aria-hidden="true"></i>Settings mode</h2>
+          <p class="card-sub">Simple uses recommended presets for every interval, timeout and threshold. Pro lets you customise everything.</p></div>
+      </div>
+      <div class="row g-3" role="radiogroup" aria-label="Settings mode">
+        <div class="col-12 col-md-6">
+          <label class="engine-option">
+            <input type="radio" name="settings_mode" value="simple">
+            <div class="engine-card">
+              <h3><i class="bi bi-magic" aria-hidden="true"></i>Simple <span class="chip chip-accent ms-1">Recommended</span></h3>
+              <p class="mb-0">Pick a scanner, your network and go. Scan schedule, ping timing, failure thresholds, phone tuning and scope rules use automatic presets and are locked.</p>
+            </div>
+          </label>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="engine-option">
+            <input type="radio" name="settings_mode" value="pro">
+            <div class="engine-card">
+              <h3><i class="bi bi-sliders2" aria-hidden="true"></i>Pro</h3>
+              <p class="mb-0">Customise every setting: intervals, timeouts, retries, thresholds, ping method, strict scope, ARP cache and the phone profile. Your Pro values are kept if you switch back to Simple.</p>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div></div>
+
+    <!-- Discovery engine -->
+    <div class="col-12"><div class="glass-card flat">
+      <div class="card-title-row">
+        <div><h2 class="card-title"><i class="bi bi-radar" aria-hidden="true"></i>Discovery engine</h2>
+          <p class="card-sub">Choose exactly one. If its requirements are missing, scans fail with instructions — Pe3k will not silently switch engines.</p></div>
+        <span id="activeEngine"></span>
+      </div>
+      <div class="row g-3" id="engineCards" role="radiogroup" aria-label="Discovery engine">
+        {% set engines = [
+          ('nmap', 'bi-terminal', 'Nmap', 'Uses your locally installed Nmap (nmap -sn) for host discovery. Best accuracy; MAC addresses need admin rights.'),
+          ('scapy', 'bi-diagram-3', 'Scapy (ARP)', 'Sends ARP requests with Scapy. Fast on a LAN; needs admin rights, and Npcap on Windows.'),
+          ('manual', 'bi-hand-index', 'Manual mode', 'No automatic scanning. Only devices you add yourself are monitored. Works everywhere.'),
+        ] %}
+        {% if demo_mode %}{% set engines = engines + [('demo', 'bi-cone-striped', 'Demo (simulated)', 'Generates fake discovery results for trying Pe3k. No packets are sent.')] %}{% endif %}
+        {% for key, icon, label, desc in engines %}
+        <div class="col-12 col-md-6 {% if demo_mode %}col-xl-3{% else %}col-xl-4{% endif %}">
+          <label class="engine-option">
+            <input type="radio" name="discovery_engine" value="{{ key }}">
+            <div class="engine-card">
+              <h3><i class="bi {{ icon }}" aria-hidden="true"></i>{{ label }}</h3>
+              <p>{{ desc }}</p>
+              <span class="engine-health" data-engine="{{ key }}"><span class="skeleton" style="width:7rem"></span></span>
+            </div>
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+    </div></div>
+
+    <!-- Scope -->
+    <div class="col-12 col-xl-6"><div class="glass-card">
+      <div class="card-title-row"><h2 class="card-title"><i class="bi bi-bullseye" aria-hidden="true"></i>Scan scope &amp; schedule</h2></div>
+      <div class="notice simple-lock mb-3 d-none"><i class="bi bi-lock" aria-hidden="true"></i><div><strong>Simple mode:</strong> scan interval, timeout, strict scope and the ARP cache use recommended presets. Switch to <a href="#" data-to-pro>Pro mode</a> to customise them.</div></div>
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label" for="sSubnet">Authorized subnet (CIDR)</label>
+          <div class="input-group">
+            <input class="form-control mono" id="sSubnet" name="authorized_subnet" placeholder="e.g. 192.168.1.0/24" autocomplete="off">
+            <button class="btn btn-glass" type="button" id="detectSubnet"><i class="bi bi-magic" aria-hidden="true"></i>Detect</button>
+          </div>
+          <div class="form-text">Nothing outside this range is ever scanned or recorded. “Detect” only suggests ranges from this computer's own interfaces.</div>
+          <div class="d-flex flex-wrap gap-2 mt-2" id="subnetSuggestions"></div>
+        </div>
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="sStrict" name="strict_scope">
+            <label class="form-check-label" for="sStrict"><strong>Strict scope</strong> (recommended)</label>
+          </div>
+          <div class="form-text">On: scans limited to private ranges no larger than /22, and only private/local IPs can be monitored.
+            Off: allows larger ranges (up to /16) and monitoring public hosts such as an upstream DNS server.</div>
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label" for="sScanInt">Scan interval (seconds)</label>
+          <input class="form-control" id="sScanInt" name="scan_interval_seconds" type="number" min="60" max="86400" step="1">
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label" for="sScanTo">Scan timeout (seconds)</label>
+          <input class="form-control" id="sScanTo" name="scan_timeout_seconds" type="number" min="5" max="600" step="1">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="sNmap">Nmap executable path <span class="text-muted fw-normal">(optional)</span></label>
+          <input class="form-control mono" id="sNmap" name="nmap_path" placeholder="Leave empty to use nmap from PATH" autocomplete="off">
+        </div>
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="sArp" name="use_arp_cache">
+            <label class="form-check-label" for="sArp">Also use this computer's ARP cache</label>
+          </div>
+          <div class="form-text">Adds devices this computer talked to recently (<span class="mono">arp -a</span>) but that were asleep during the scan — typically locked iPhones — and fills in MAC addresses Nmap couldn't read. No packets are sent. Only entries inside the authorized subnet are used.</div>
+        </div>
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="sAuto" name="auto_scan_enabled">
+            <label class="form-check-label" for="sAuto">Run discovery scans automatically</label>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="form-check d-flex gap-2 align-items-start p-3 rounded-3" style="background:var(--warn-soft)">
+            <input class="form-check-input ms-0 mt-1 flex-shrink-0" type="checkbox" id="sAck" name="scan_authorized_ack">
+            <label class="form-check-label" for="sAck">I own this network or am explicitly authorized to scan and monitor it.</label>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <!-- Monitoring -->
+    <div class="col-12 col-xl-6"><div class="glass-card">
+      <div class="card-title-row"><h2 class="card-title"><i class="bi bi-broadcast" aria-hidden="true"></i>Availability monitoring</h2></div>
+      <div class="notice simple-lock mb-3 d-none"><i class="bi bi-lock" aria-hidden="true"></i><div><strong>Simple mode:</strong> all monitoring values use recommended presets. Switch to <a href="#" data-to-pro>Pro mode</a> to customise them.</div></div>
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <label class="form-label" for="sPingInt">Ping interval (seconds)</label>
+          <input class="form-control" id="sPingInt" name="ping_interval_seconds" type="number" min="10" max="3600">
+          <div class="form-text">30–60 s recommended.</div>
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label" for="sPingTo">Ping timeout (seconds)</label>
+          <input class="form-control" id="sPingTo" name="ping_timeout_seconds" type="number" min="0.2" max="10" step="0.1">
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label" for="sRetries">Retries per check</label>
+          <input class="form-control" id="sRetries" name="ping_retries" type="number" min="0" max="5">
+          <div class="form-text">A check succeeds if any attempt gets a reply.</div>
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label" for="sThreshold">Consecutive failures before “offline”</label>
+          <input class="form-control" id="sThreshold" name="failure_threshold" type="number" min="1" max="20">
+          <div class="form-text">Prevents false alerts from a single lost ping.</div>
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label" for="sMethod">Ping method</label>
+          <select class="form-select" id="sMethod" name="ping_method">
+            <option value="auto">Auto (ping3 → system ping)</option>
+            <option value="ping3">ping3 only</option>
+            <option value="system">System ping command</option>
+          </select>
+        </div>
+        <div class="col-sm-6 d-flex align-items-end">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="sOffAlerts" name="offline_alerts_enabled">
+            <label class="form-check-label" for="sOffAlerts">Create alerts when devices go offline</label>
+          </div>
+        </div>
+        <div class="col-12"><hr class="my-1" style="border-color:var(--hairline);opacity:1">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+            <div><strong class="small"><i class="bi bi-phone" aria-hidden="true"></i> Phones &amp; tablets</strong>
+              <div class="form-text mt-0">They power-save Wi-Fi when locked, so they get a gentler profile and are marked offline later.</div></div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" role="switch" id="sPhone" name="phone_tuning_enabled">
+              <label class="form-check-label small" for="sPhone">Enabled</label>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="sPTo">Timeout (s)</label>
+          <input class="form-control" id="sPTo" name="phone_ping_timeout_seconds" type="number" min="0.5" max="10" step="0.1">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="sPRt">Retries</label>
+          <input class="form-control" id="sPRt" name="phone_ping_retries" type="number" min="0" max="8">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="sPDl">Retry gap (s)</label>
+          <input class="form-control" id="sPDl" name="phone_retry_delay_seconds" type="number" min="0" max="5" step="0.05">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="sPTh">Failures → offline</label>
+          <input class="form-control" id="sPTh" name="phone_failure_threshold" type="number" min="1" max="30">
+        </div>
+        <div class="col-12"><div class="stat-row"><span class="k">Active ping method</span><span class="v" id="pingActive">—</span></div>
+          <div id="pingNotes"></div></div>
+      </div>
+    </div></div>
+
+    <div class="col-12">
+      <div class="save-bar" id="saveBar">
+        <span class="save-state" id="saveState" aria-live="polite"><i class="bi bi-check2-circle ok-text" aria-hidden="true"></i>All changes saved</span>
+        <div class="d-flex gap-2">
+          <button class="btn btn-glass" type="button" id="resetForm" disabled>Discard changes</button>
+          <button class="btn btn-accent" type="submit" id="saveBottom"><i class="bi bi-check2" aria-hidden="true"></i>Save settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="row g-3 mt-1">
+  <div class="col-12"><h2 class="h5 fw-bold mt-3 mb-0">Dependency &amp; permission health</h2></div>
+  <div class="col-12 col-lg-6 col-xxl-4"><div class="glass-card"><div class="card-title-row"><h3 class="card-title"><i class="bi bi-terminal"></i>Nmap</h3><span data-health-chip="nmap"></span></div><div data-health="nmap"></div></div></div>
+  <div class="col-12 col-lg-6 col-xxl-4"><div class="glass-card"><div class="card-title-row"><h3 class="card-title"><i class="bi bi-diagram-3"></i>Scapy</h3><span data-health-chip="scapy"></span></div><div data-health="scapy"></div></div></div>
+  <div class="col-12 col-lg-6 col-xxl-4"><div class="glass-card"><div class="card-title-row"><h3 class="card-title"><i class="bi bi-pc-display"></i>System</h3></div><div id="systemHealth"></div></div></div>
+  <div class="col-12 col-lg-6"><div class="glass-card"><div class="card-title-row"><h3 class="card-title"><i class="bi bi-box-seam"></i>Python packages</h3></div><div id="pkgHealth"></div></div></div>
+  <div class="col-12 col-lg-6"><div class="glass-card"><div class="card-title-row"><h3 class="card-title"><i class="bi bi-alarm"></i>Background jobs</h3></div><div id="jobHealth"></div></div></div>
+  <div class="col-12"><div class="glass-card">
+    <div class="card-title-row"><h3 class="card-title"><i class="bi bi-journal-text"></i>Recent scans</h3>
+      <a class="small" href="#" id="reloadScans">Refresh</a></div>
+    <div class="table-wrap"><table class="table table-glass">
+      <thead><tr><th>Started</th><th>Engine</th><th class="hide-xs">Range</th><th class="hide-xs">Trigger</th><th>Result</th><th class="text-end hide-xs">Duration</th></tr></thead>
+      <tbody id="scanRows"></tbody></table></div>
+  </div></div>
+
+  <!-- Danger zone -->
+  <div class="col-12"><div class="glass-card flat danger-zone">
+    <div class="card-title-row mb-0">
+      <div><h3 class="card-title"><i class="bi bi-exclamation-octagon bad-text" aria-hidden="true"></i>Danger zone</h3>
+        <p class="card-sub">Restore the default settings, or wipe Pe3k back to a fresh install.</p></div>
+      <button class="btn btn-danger" type="button" id="openReset"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset…</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- Reset modal -->
+<div class="modal fade" id="resetModal" tabindex="-1" aria-labelledby="resetTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="factoryForm" novalidate>
+      <div class="modal-header">
+        <h2 class="modal-title" id="resetTitle"><i class="bi bi-exclamation-octagon bad-text" aria-hidden="true"></i> Reset Pe3k</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="notice bad d-none mb-3" data-form-error role="alert"></div>
+        <p class="text-2 small mb-3">Choose what to reset. This can't be undone.</p>
+        <div class="d-grid gap-2" role="radiogroup" aria-label="Reset scope">
+          <label class="engine-option">
+            <input type="radio" name="scope" value="settings" checked>
+            <div class="engine-card">
+              <h3><i class="bi bi-sliders" aria-hidden="true"></i>Reset settings only</h3>
+              <p class="mb-0">Every setting goes back to its default (Simple mode, Manual scanner, no subnet). Your devices, history, alerts and bandwidth logs are kept.</p>
+            </div>
+          </label>
+          <label class="engine-option">
+            <input type="radio" name="scope" value="all">
+            <div class="engine-card">
+              <h3><i class="bi bi-trash3 bad-text" aria-hidden="true"></i>Factory reset (everything)</h3>
+              <p class="mb-0">Deletes <strong>all</strong> trusted devices, monitoring history, alerts, bandwidth logs, scan logs and settings, and forgets your theme choice. Pe3k will be like a fresh install.</p>
+            </div>
+          </label>
+        </div>
+        <div class="mt-3 d-none" id="confirmTyped">
+          <label class="form-label" for="resetConfirm">Type <span class="mono bad-text">RESET</span> to confirm</label>
+          <input class="form-control mono" id="resetConfirm" name="confirm" autocomplete="off" spellcheck="false" placeholder="RESET">
+        </div>
+        <div class="form-check mt-3" id="confirmCheckWrap">
+          <input class="form-check-input" type="checkbox" id="resetConfirmCheck">
+          <label class="form-check-label small" for="resetConfirmCheck">Yes, I want to reset all settings to their defaults.</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-danger" id="doReset" disabled><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset settings</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Unsaved changes modal -->
+<div class="modal fade" id="unsavedModal" tabindex="-1" aria-labelledby="unsavedTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="unsavedTitle"><i class="bi bi-floppy warn-text" aria-hidden="true"></i> Save your changes?</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stay on Settings"></button>
+      </div>
+      <div class="modal-body text-2">
+        <p class="mb-2">You changed settings on this page but haven't saved them.</p>
+        <p class="mb-0 small">Scans and monitoring only use <strong>saved</strong> settings. Save them before leaving?</p>
+        <div class="notice bad d-none mt-3" id="unsavedError" role="alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-glass" id="leaveNoSave">No, discard</button>
+        <button type="button" class="btn btn-accent" id="leaveSave"><i class="bi bi-check2" aria-hidden="true"></i>Yes, save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/settings.js') }}?v={{ app_version }}"></script>{% endblock %}

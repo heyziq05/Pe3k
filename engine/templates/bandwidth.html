@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Bandwidth Usage{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Bandwidth usage</h1>
+    <p>Upload and download throughput of the computer running Pe3k.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-glass" id="exportBw" href="{{ url_for('exports.bandwidth_csv') }}"><i class="bi bi-filetype-csv" aria-hidden="true"></i>Export CSV</a>
+  </div>
+</div>
+
+<div class="notice warn mb-3">
+  <i class="bi bi-info-circle" aria-hidden="true"></i>
+  <div><strong>Host traffic only.</strong> These figures measure the network interfaces of <em>this computer</em> (via psutil).
+    They do not include traffic from phones, TVs or other devices on your network — that would need router-level monitoring.</div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-4"><div class="glass-card">
+    <div class="card-title-row"><h2 class="card-title"><i class="bi bi-ethernet" aria-hidden="true"></i>Interface</h2></div>
+    <label class="form-label" for="ifaceSelect">Measure traffic on</label>
+    <select class="form-select" id="ifaceSelect"><option value="all">All interfaces (excluding loopback)</option></select>
+    <div class="mt-3" id="ifaceInfo"></div>
+    <div class="form-text mt-2">Changing the interface restarts the live measurement. Stored history keeps the interface name.</div>
+  </div></div>
+  <div class="col-6 col-lg-4"><div class="glass-card kpi">
+    <span class="kpi-icon info"><i class="bi bi-arrow-down" aria-hidden="true"></i></span>
+    <span class="kpi-label">Download now</span>
+    <span class="kpi-value tabular"><span id="rxNow">—</span><span class="unit">Mbps</span></span>
+    <span class="kpi-foot">Today <strong class="tabular" id="rxToday">—</strong></span>
+    <span class="kpi-foot text-muted small">Counter since boot: <span class="tabular" id="rxCounter">—</span></span>
+  </div></div>
+  <div class="col-6 col-lg-4"><div class="glass-card kpi">
+    <span class="kpi-icon info"><i class="bi bi-arrow-up" aria-hidden="true"></i></span>
+    <span class="kpi-label">Upload now</span>
+    <span class="kpi-value tabular"><span id="txNow">—</span><span class="unit">Mbps</span></span>
+    <span class="kpi-foot">Today <strong class="tabular" id="txToday">—</strong></span>
+    <span class="kpi-foot text-muted small">Counter since boot: <span class="tabular" id="txCounter">—</span></span>
+  </div></div>
+
+  <div class="col-12"><div class="glass-card">
+    <div class="card-title-row">
+      <div><h2 class="card-title"><i class="bi bi-activity" aria-hidden="true"></i>Live throughput</h2>
+        <div class="legend mt-1"><span><i style="background:var(--series-1)"></i>Download</span><span><i style="background:var(--series-2)"></i>Upload</span>
+        <span class="text-muted" id="liveNote"></span></div></div>
+      <span class="card-sub" id="bwErr"></span>
+    </div>
+    <div class="chart-box"><canvas id="liveChart" role="img" aria-label="Live throughput chart"></canvas><div class="chart-empty">Collecting the first samples…</div></div>
+  </div></div>
+
+  <div class="col-12 col-xl-7"><div class="glass-card">
+    <div class="card-title-row">
+      <div><h2 class="card-title"><i class="bi bi-graph-up" aria-hidden="true"></i>Usage history</h2>
+        <div class="legend mt-1"><span><i style="background:var(--series-1)"></i>Download</span><span><i style="background:var(--series-2)"></i>Upload</span></div></div>
+      <div class="btn-group-glass" role="group" aria-label="History window" id="histWindow">
+        <button class="btn" type="button" data-w="1h">1h</button><button class="btn" type="button" data-w="6h">6h</button>
+        <button class="btn active" type="button" data-w="24h" aria-pressed="true">24h</button><button class="btn" type="button" data-w="7d">7d</button>
+        <button class="btn" type="button" data-w="30d">30d</button>
+      </div>
+    </div>
+    <div class="chart-box tall"><canvas id="histChart" role="img" aria-label="Bandwidth history chart"></canvas><div class="chart-empty">No stored samples yet. A row is saved every minute.</div></div>
+    <div class="d-flex gap-4 mt-3 small flex-wrap">
+      <span class="text-muted">Received in window <strong class="text-2 tabular" id="winRx">—</strong></span>
+      <span class="text-muted">Sent in window <strong class="text-2 tabular" id="winTx">—</strong></span>
+    </div>
+  </div></div>
+  <div class="col-12 col-xl-5"><div class="glass-card">
+    <div class="card-title-row">
+      <div><h2 class="card-title"><i class="bi bi-calendar3" aria-hidden="true"></i>Daily totals</h2>
+        <div class="legend mt-1"><span><i style="background:var(--series-1)"></i>Downloaded</span><span><i style="background:var(--series-2)"></i>Uploaded</span></div></div>
+      <span class="card-sub">Last 14 days</span>
+    </div>
+    <div class="chart-box tall"><canvas id="dailyChart" role="img" aria-label="Daily totals chart"></canvas><div class="chart-empty">No daily data yet.</div></div>
+  </div></div>
+
+  <div class="col-12"><div class="glass-card">
+    <div class="card-title-row"><h2 class="card-title"><i class="bi bi-table" aria-hidden="true"></i>Daily totals table</h2></div>
+    <div class="table-wrap"><table class="table table-glass">
+      <thead><tr><th>Day</th><th class="text-end">Downloaded</th><th class="text-end">Uploaded</th><th class="text-end hide-xs">Peak download</th><th class="text-end hide-xs">Peak upload</th></tr></thead>
+      <tbody id="dailyRows"></tbody></table></div>
+  </div></div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/bandwidth.js') }}?v={{ app_version }}"></script>{% endblock %}

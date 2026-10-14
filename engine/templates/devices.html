@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Trusted Devices{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Trusted devices</h1>
+    <p>Devices Pe3k pings for availability and uses to recognise known hardware during scans.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-glass" href="{{ url_for('exports.devices_csv') }}"><i class="bi bi-filetype-csv" aria-hidden="true"></i>Export CSV</a>
+    <button class="btn btn-accent" type="button" id="addDevice"><i class="bi bi-plus-lg" aria-hidden="true"></i>Add device</button>
+  </div>
+</div>
+
+<div class="glass-card flat">
+  <form class="row g-2 align-items-end mb-3" id="filters" role="search" onsubmit="return false">
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="fSearch">Search</label>
+      <div class="input-icon"><i class="bi bi-search" aria-hidden="true"></i>
+        <input class="form-control" id="fSearch" name="search" type="search" placeholder="Name, IP, MAC or notes" autocomplete="off"></div>
+    </div>
+    <div class="col-4 col-md-2">
+      <label class="form-label" for="fStatus">Status</label>
+      <select class="form-select" id="fStatus" name="status">
+        <option value="">All</option><option value="online">Online</option><option value="unstable">Unstable</option>
+        <option value="offline">Offline</option><option value="unknown">Pending</option>
+      </select>
+    </div>
+    <div class="col-4 col-md-3">
+      <label class="form-label" for="fType">Type</label>
+      <select class="form-select" id="fType" name="type">
+        <option value="">All types</option>
+        {% for key, label in device_type_labels.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-4 col-md-2">
+      <label class="form-label" for="fTrusted">Trust</label>
+      <select class="form-select" id="fTrusted" name="trusted">
+        <option value="">All</option><option value="1">Trusted</option><option value="0">Not trusted</option>
+      </select>
+    </div>
+    <div class="col-12 col-md-1 d-grid">
+      <button class="btn btn-glass" type="button" id="fReset" title="Clear filters"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="d-md-none">Clear filters</span></button>
+    </div>
+  </form>
+  <div class="d-flex justify-content-between align-items-center mb-2 small text-muted">
+    <span id="resultCount" aria-live="polite"></span>
+    <span class="hide-xs">Offline is confirmed only after the configured number of consecutive failed checks.</span>
+  </div>
+  <div class="table-wrap">
+    <table class="table table-glass table-hover">
+      <thead><tr>
+        <th>Device</th><th class="hide-xs">MAC address</th><th>Status</th><th class="text-end hide-xs">Latency</th>
+        <th class="hide-xs">Last seen</th><th class="hide-xs">Trusted</th><th class="hide-xs">Added</th><th class="text-end">Actions</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add / edit modal -->
+<div class="modal fade" id="deviceModal" tabindex="-1" aria-labelledby="deviceModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form class="modal-content" id="deviceForm" novalidate>
+      <div class="modal-header">
+        <h2 class="modal-title" id="deviceModalTitle">Add device</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="notice bad d-none mb-3" data-form-error role="alert"></div>
+        <input type="hidden" name="id">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="dName">Name</label>
+            <input class="form-control" id="dName" name="name" maxlength="64" required placeholder="e.g. Home Router">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="dType">Device type</label>
+            <select class="form-select" id="dType" name="device_type">
+              {% for key, label in device_type_labels.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="dIp">IP address</label>
+            <input class="form-control mono" id="dIp" name="ip_address" required placeholder="192.168.1.1" inputmode="decimal" autocomplete="off">
+            <div class="form-text">Private/local addresses only while Strict scope is on.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="dMac">MAC address <span class="text-muted fw-normal">(recommended)</span></label>
+            <input class="form-control mono" id="dMac" name="mac_address" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off">
+            <div class="form-text">Used to recognise the device in scans. Find it with <span class="mono">arp -a</span>.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="dNotes">Notes</label>
+            <textarea class="form-control" id="dNotes" name="notes" rows="2" maxlength="500" placeholder="Location, owner, purpose…"></textarea>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="dTrusted" name="trusted" checked>
+              <label class="form-check-label" for="dTrusted">Trusted device</label>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="dMon" name="monitoring_enabled" checked>
+              <label class="form-check-label" for="dMon">Monitor availability (ping)</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-accent" id="saveDevice"><i class="bi bi-check2" aria-hidden="true"></i>Save device</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/devices.js') }}?v={{ app_version }}"></script>{% endblock %}

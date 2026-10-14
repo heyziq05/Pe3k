@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Pe3k{% endblock %} · Pe3k</title>
+  <meta name="author" content="heyziq05">
+  <meta name="description" content="Pe3k — local network monitoring, security and bandwidth monitoring">
+  <script>
+    /* Apply the saved theme (or the OS preference) before first paint to avoid a flash. */
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("pe3k-theme"); } catch (e) {}
+      if (t !== "light" && t !== "dark") {
+        t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      }
+      document.documentElement.setAttribute("data-theme", t);
+      document.documentElement.setAttribute("data-bs-theme", t);
+    })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pe3k.css') }}?v={{ app_version }}">
+  {% block head %}{% endblock %}
+</head>
+<body data-page="{{ page }}">
+  <div class="pe3k-backdrop" aria-hidden="true"></div>
+  <a class="visually-hidden-focusable btn btn-accent position-absolute m-2" style="z-index:2000" href="#main">Skip to content</a>
+
+  {% if demo_mode %}
+  <div class="demo-banner" role="status"><i class="bi bi-cone-striped"></i> Demo mode — ping results and the “Demo” scanner are simulated. Bandwidth figures are real (this computer).</div>
+  {% endif %}
+
+  <nav class="navbar navbar-expand-lg navbar-glass" aria-label="Main navigation">
+    <div class="container-xxl">
+      <a class="brand me-3" href="{{ url_for('pages.dashboard') }}" aria-label="Pe3k home">
+        {% include "partials/logo.svg" %}
+        <span>Pe3k<small>Network Watch</small></span>
+      </a>
+      <div class="d-flex align-items-center gap-2 order-lg-last ms-auto ms-lg-3">
+        <span class="scanner-pill d-none d-sm-inline-flex" id="navScanner" title="Discovery engine">
+          <span class="dot"></span><span class="label">Scanner…</span>
+        </span>
+        <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Switch colour theme" title="Toggle light / dark">
+          <i class="bi bi-moon-stars-fill" aria-hidden="true"></i><i class="bi bi-sun-fill" aria-hidden="true"></i>
+        </button>
+        <button class="navbar-toggler icon-btn d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+          <i class="bi bi-list" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav gap-lg-1">
+          {% set nav = [
+            ('dashboard', 'pages.dashboard', 'bi-grid-1x2', 'Dashboard'),
+            ('devices', 'pages.devices', 'bi-hdd-network', 'Trusted Devices'),
+            ('alerts', 'pages.alerts', 'bi-shield-exclamation', 'Alerts'),
+            ('history', 'pages.history', 'bi-clock-history', 'Device History'),
+            ('bandwidth', 'pages.bandwidth', 'bi-speedometer2', 'Bandwidth'),
+            ('settings', 'pages.settings', 'bi-sliders', 'Settings'),
+          ] %}
+          {% for key, endpoint, icon, label in nav %}
+          <li class="nav-item">
+            <a class="nav-link {% if page == key %}active{% endif %}" href="{{ url_for(endpoint) }}" {% if page == key %}aria-current="page"{% endif %}>
+              <i class="bi {{ icon }}" aria-hidden="true"></i>{{ label }}
+              {% if key == 'alerts' %}<span class="nav-count d-none" id="navAlertCount" aria-label="open alerts"></span>{% endif %}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="container-xxl pb-4">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="pe3k-footer container-xxl">
+    <div>Pe3k v{{ app_version }} · Monitor only networks you own or are authorized to monitor.</div>
+    <div class="mt-1">Made by <a class="author-link" href="https://github.com/heyziq05" target="_blank" rel="noopener noreferrer"><i class="bi bi-github" aria-hidden="true"></i> @heyziq05</a> on GitHub</div>
+  </footer>
+
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pe3k.js') }}?v={{ app_version }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
