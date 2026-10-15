@@ -16,16 +16,17 @@ responsive liquid-glass web UI with light and dark themes.
 ## Contents
 
 1. [Features](#features)
-2. [Quick start](#quick-start)
-3. [Discovery engines: Nmap, Scapy, Manual](#discovery-engines)
-4. [Configuration](#configuration)
-5. [How monitoring works](#how-monitoring-works)
-6. [Pages](#pages)
-7. [CSV exports](#csv-exports)
-8. [Project layout](#project-layout)
-9. [Tests](#tests)
-10. [Security notes](#security-notes)
-11. [Troubleshooting](#troubleshooting)
+2. [Tech stack](#tech-stack)
+3. [Quick start](#quick-start)
+4. [Discovery engines: Nmap, Scapy, Manual](#discovery-engines)
+5. [Configuration](#configuration)
+6. [How monitoring works](#how-monitoring-works)
+7. [Pages](#pages)
+8. [CSV exports](#csv-exports)
+9. [Project layout](#project-layout)
+10. [Tests](#tests)
+11. [Security notes](#security-notes)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -42,6 +43,49 @@ responsive liquid-glass web UI with light and dark themes.
 | **CSV exports** | Devices, a device's monitoring history, alerts, bandwidth logs and uptime summary. |
 | **UI** | Light/dark toggle (remembered in `localStorage`, defaults to the OS preference), responsive layout, accessible status badges (icon + label), loading skeletons, empty states. |
 | **Reliability** | Transactions, parameterised SQL, validation, structured JSON logs, scheduler started once with graceful shutdown, retention cleanup, demo mode. |
+
+---
+
+## Tech stack
+
+### Backend (Python 3.10+)
+
+| Technology | Used for |
+|---|---|
+| **Flask** | Web framework: serves the pages, the JSON API used by the front end, and the CSV downloads |
+| **Waitress** | Production web server that runs the Flask app (works well on Windows) |
+| **SQLite** | Database for devices, ping history, alerts, bandwidth logs, scan logs and settings (built into Python, nothing to install) |
+| **APScheduler** | Runs the background jobs: ping cycle, discovery scans, bandwidth sampling and daily cleanup |
+| **ping3** | Pings devices to check whether they are online and measure latency (falls back to the system `ping` command when needed) |
+| **psutil** | Reads this computer's network-interface counters for the bandwidth monitor |
+| **Scapy** | *Scapy (ARP)* discovery engine: sends ARP requests to find devices on the local network |
+| **Nmap** *(optional, installed separately)* | *Nmap* discovery engine: host discovery (`nmap -sn`) |
+| **python-dotenv** | Loads settings from a `.env` file |
+| **csv** (Python standard library) | Builds the CSV exports |
+| **pytest** | Automated tests |
+
+### Frontend
+
+| Technology | Used for |
+|---|---|
+| **HTML + Jinja2 templates** | Page layouts, rendered by Flask |
+| **Bootstrap 5** | Layout grid, responsive design, modals, forms and toasts |
+| **Custom CSS** | The glass-style look, light/dark themes, animations and the logo hover effect |
+| **JavaScript** | Live updates, filters, forms, theme toggle, page transitions and the unsaved-changes prompt |
+| **Chart.js** | Latency, availability and bandwidth charts |
+| **Bootstrap Icons** | Interface icons |
+| **Inter** | Font |
+
+All front-end libraries are included in `engine/static/vendor`, so Pe3k works without an internet
+connection.
+
+### System tools Pe3k uses (if present)
+
+| Tool | Used for |
+|---|---|
+| **Npcap** (Windows) | Lets Scapy and Nmap send and capture raw network packets |
+| **`arp -a` / `ip neigh`** | Reads the computer's list of recently seen devices to find phones that were asleep during a scan |
+| **`ping`** | Fallback ping method when ping3 isn't allowed to send pings directly |
 
 ---
 
